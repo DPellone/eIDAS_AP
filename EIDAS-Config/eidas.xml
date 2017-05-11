@@ -14,18 +14,18 @@
 	<!-- <entry key="DEMO-SP">givenName;age;dateOfBirth;nationalityCode;isAgeOver;eIdentifier</entry> -->
 
 	<!-- Id of this Connector -->
-	<entry key="connector.id">CA</entry>
+	<entry key="connector.id">IT</entry>
 	<!-- Connector assertion URL -->
-	<entry key="connector.assertion.url">http://eidasnode:8888/EidasNode/ColleagueResponse</entry>
+	<entry key="connector.assertion.url">http://192.168.89.134:8080/EidasNode/ColleagueResponse</entry>
 	<!-- Connector destination URL -->
-	<entry key="connector.destination.url">http://eidasnode:8888/EidasNode/ServiceProvider</entry>
+	<entry key="connector.destination.url">http://192.168.89.134:8080/EidasNode/ServiceProvider</entry>
 	<!--  Default SP attributes needed on the VIdP -->
 	<!-- SP Sector -->
 	<entry key="connector.spSector">DEMO-connector</entry>
 	<!-- SP Application -->
 	<entry key="connector.spApplication">DEMO-connector</entry>
 	<!-- SP Country-->
-	<entry key="connector.spCountry">CA</entry>
+	<entry key="connector.spCountry">IT</entry>
 	<!-- SP Institution-->
 	<entry key="connector.spInstitution">DEMO-connector</entry>
 
@@ -33,71 +33,25 @@
 	<entry key="saml.service">Connector-Service</entry>
 
 	<!-- Number of known Service -->
-	<entry key="service.number">8</entry>
+	<entry key="service.number">1</entry>
 
-    <entry key="service1.id">CA</entry>
+    <entry key="service1.id">IT</entry>
 	<!-- Name of the second Service -->
-	<entry key="service1.name">LOCAL-EIDAS-CA</entry>
+	<entry key="service1.name">LOCAL-EIDAS-IT</entry>
 	<!-- URL of the first Service -->
-	<entry key="service1.url">http://eidasnode:8888/EidasNode/ColleagueRequest</entry>
+	<entry key="service1.url">http://192.168.89.134:8080/EidasNode/ColleagueRequest</entry>
 	 <!-- Skew time for Service-->
         <entry key="service1.skew">1000</entry>
 	<!-- the url under which  service1 is publishing its metadata -->
-	<entry key="service1.metadata.url">http://eidasnode:8888/EidasNode/ServiceMetadata</entry>
-	<entry key="service2.id">CB</entry>
-	<!-- Name of the second Service -->
-	<entry key="service2.name">LOCAL-EIDAS-CB</entry>
-	<!-- URL of the first Service -->
-	<entry key="service2.url">http://eidasnode:8888/EidasNode/ColleagueRequest</entry>
-	<entry key="service2.skew">1000</entry>
-	<entry key="service2.metadata.url">http://eidasnode:8888/EidasNode/ServiceMetadata</entry>
-	<entry key="service3.id">CC</entry>
-	<!-- Name of the second Service -->
-	<entry key="service3.name">LOCAL-EIDAS-CC</entry>
-	<!-- URL of the first Service -->
-	<entry key="service3.url">http://vs-cis-k2:8085/EidasNode/ColleagueRequest</entry>
-	<entry key="service3.skew">1000</entry>
-	<entry key="service3.metadata.url">http://vs-cis-k2:8085/EidasNode/ServiceMetadata</entry>
-	<entry key="service4.id">CD</entry>
-	<!-- Name of the second Service -->
-	<entry key="service4.name">LOCAL-EIDAS-CD</entry>
-	<!-- URL of the first Service -->
-	<entry key="service4.url">http://vs-cis-k2:7001/EidasNode/ColleagueRequest</entry>
-	<entry key="service4.skew">1000</entry>
-	<entry key="service4.metadata.url">http://vs-cis-k2:7001/EidasNode/ServiceMetadata</entry>
-	<entry key="service5.id">AT</entry>
-	<!-- Name of the second Service -->
-	<entry key="service5.name">AT-VIDP Local</entry>
-	<!-- URL of the first Service -->
-	<entry key="service5.url">http://vs-cis-k2:8185/VIDP-V-PEPS-web/SendPEPSAuthnRequest</entry>
-	<entry key="service5.skew">1000</entry>
-	<entry key="service5.metadata.url">http://vs-cis-k2:8185/EidasNode/ServiceMetadata</entry>
- 	<entry key="service6.id">DE</entry>
-	<!-- Name of the second Service -->
-	<entry key="service6.name">DE-Local</entry>
-	<!-- URL of the first Service -->
-	<entry key="service6.url">http://vs-cis-k2:8185/VIDP-V-PEPS-web/SendPEPSAuthnRequest</entry>
-    <entry key="service6.skew">1000</entry>
-	<entry key="service6.metadata.url">http://vs-cis-k2:8185/EidasNode/ServiceMetadata</entry>
-	<entry key="service7.id">CF</entry>
-	<!-- Name of the second Service -->
-	<entry key="service7.name">LOCAL-EIDAS-CF</entry>
-	<entry key="service7.url">http://vs-cis-k2:9080/EidasNode/ColleagueRequest</entry>
-	<entry key="service7.skew">1000</entry>
-	<entry key="service7.metadata.url">http://vs-cis-k2:9080/EidasNode/ServiceMetadata</entry>
-	   <entry key="service8.id">CE</entry>
-	<!-- Name of the second Service -->
-	<entry key="service8.name">LOCAL-EIDAS-CE</entry>
-	<entry key="service8.url">http://vs-cis-k2/EidasNode/ColleagueRequest</entry>
-	<entry key="service8.skew">1000</entry>
-	<entry key="service8.metadata.url">http://vs-cis-k2/EidasNode/ServiceMetadata</entry>
-	<!-- URL of the first Service -->
+	<entry key="service1.metadata.url">http://192.168.89.134:8080/EidasNode/ServiceMetadata</entry>
+	
+	
 	<!-- service -->
 
 	<!-- Id of this Service -->
-	<entry key="service.id">CA</entry>
+	<entry key="service.id">IT</entry>
 	<!-- Country Code of this Service -->
-	<entry key="service.countrycode">CA</entry>
+	<entry key="service.countrycode">IT</entry>
 	<!-- QAALevel of this Service -->
 	<entry key="service.maxQAAlevel">4</entry>
 
@@ -113,7 +67,7 @@
 	<entry key="service.askconsent.attribute.names.only">false</entry>
 
 	<!-- Method to call after IdP -->
-	<entry key="service.specificidpredirect.url">http://eidasnode:8888/EidasNode/IdpResponse</entry>
+	<entry key="service.specificidpredirect.url">http://192.168.89.134:8080/EidasNode/IdpResponse</entry>
 	<!-- Action of Citizen Consent -->
 	<entry key="service.citizenConsentUrl">CitizenConsent</entry>
 
@@ -139,11 +93,6 @@
 	<!--  New Configuration -->
 	<!--  SP's ProviderName alias could be none or the PROVIDERNAME  -->
 	<entry key="DEMO-SP.validation">none</entry>
-	<entry key="DEMO-SP-CB.validation">none</entry>
-	<entry key="DEMO-SP-CC.validation">none</entry>
-	<entry key="DEMO-SP-CD.validation">none</entry>
-	<entry key="DEMO-SP-CE.validation">none</entry>
-	<entry key="DEMO-SP-CF.validation">none</entry>
 
 	<!-- PLugin connector -->
         <entry key="active.module.connector">true</entry>
@@ -151,16 +100,17 @@
 	<!-- PLugin service -->
         <entry key="active.module.service">true</entry>
 
-	<!-- PLugin AT -->
+	<!-- PLugin AT
 	<entry key="active.module.pluginAT">true</entry>
 	<entry key="at.plugin.configLocation">c:\Pgm\projects\configEidas\tomcat\</entry>
-
-	<!-- PLugin DE -->
+ -->
+	<!-- PLugin DE
 	<entry key="active.module.pluginDE">true</entry>
 	<entry key="de.plugin.configLocation">c:\Pgm\projects\configEidas\tomcat\</entry>
-	<!--Profile 1 or 2, if missing then the connector will work in Profile 1-->
 	<entry key="de.plugin.profile">1</entry>
-
+ -->
+	<!--Profile 1 or 2, if missing then the connector will work in Profile 1-->
+	
 	<!-- Binding -->
         <entry key="allow.redirect.binding">true</entry>
 	<entry key="validate.binding">true</entry>
@@ -219,25 +169,25 @@
         <entry key="metadata.activate">true</entry>
 
         <!--connector Metadata -->
-        <entry key="connector.node.url">http://eidasnode:8888/EidasNode/</entry>
+        <entry key="connector.node.url">http://192.168.89.134:8080/EidasNode/</entry>
         <entry key="connector.contact.email">test@com</entry>
-        <entry key="connector.metadata.url">http://eidasnode:8888/EidasNode/ConnectorMetadata</entry>
+        <entry key="connector.metadata.url">http://192.168.89.134:8080/EidasNode/ConnectorMetadata</entry>
 
        <!--service Metadata -->
-        <entry key="service.node.url">hhttp://eidasnode:8888/EidasNode/</entry>
+        <entry key="service.node.url">hhttp://192.168.89.134:8080/EidasNode/</entry>
         <entry key="service.contact.email">test@com</entry>
-        <entry key="service.metadata.url">http://eidasnode:8888/EidasNode/ServiceMetadata</entry>
+        <entry key="service.metadata.url">http://192.168.89.134:8080/EidasNode/ServiceMetadata</entry>
 
-	<entry key="metadata.file.repository">c:\Pgm\projects\configeidas\tomcat\metadata</entry>
+	<entry key="metadata.file.repository">/home/daniele/Documenti/apache-tomcat-8.0.43/EIDAS-node/metadata</entry>
 	<entry key="metadata.http.retrieval">true</entry>
 
          <!-- Eidas Node Service Metadata Single Sign On locations for ServiceMetadata-->
-	<entry key="ssos.serviceMetadataGeneratorIDP.redirect.location">http://eidasnode:8888/EidasNode/ColleagueRequest</entry>
-	<entry key="ssos.serviceMetadataGeneratorIDP.post.location">http://eidasnode:8888/EidasNode/ColleagueRequest</entry>
+	<entry key="ssos.serviceMetadataGeneratorIDP.redirect.location">http://192.168.89.134:8080/EidasNode/ColleagueRequest</entry>
+	<entry key="ssos.serviceMetadataGeneratorIDP.post.location">http://192.168.89.134:8080/EidasNode/ColleagueRequest</entry>
 
          <!-- Eidas Node Service Metadata Single Sign On locations for ConnectorResponseMetadata-->
-	<entry key="ssos.connectorMetadataGeneratorIDP.redirect.location">http://eidasnode:8888/EidasNode/ServiceProvider</entry>
-	<entry key="ssos.connectorMetadataGeneratorIDP.post.location">http://eidasnode:8888/EidasNode/ServiceProvider</entry>
+	<entry key="ssos.connectorMetadataGeneratorIDP.redirect.location">http://192.168.89.134:8080/EidasNode/ServiceProvider</entry>
+	<entry key="ssos.connectorMetadataGeneratorIDP.post.location">http://192.168.89.134:8080/EidasNode/ServiceProvider</entry>
 
 	<!--
         Check that the citizen country code in the SAMLRequest is the same than the country of the Service signing certificate
@@ -287,9 +237,9 @@
 	-->
 	<entry key="node.metadata.not.signed.descriptors"></entry>
 	<!-- connector metadata url, advertising connector as IdP, for communication with the SP -->
-	<entry key="connector.responder.metadata.url">http://eidasnode:8888/EidasNode/ConnectorResponderMetadata</entry>
+	<entry key="connector.responder.metadata.url">http://192.168.89.134:8080/EidasNode/ConnectorResponderMetadata</entry>
 	<!-- service/Specific metadata url, advertising connector as SP - for communication with the IdP -->
-	<entry key="service.requester.metadata.url">http://eidasnode:8888/EidasNode/ServiceRequesterMetadata</entry>
+	<entry key="service.requester.metadata.url">http://192.168.89.134:8080/EidasNode/ServiceRequesterMetadata</entry>
 
 	<!-- whether the connector supports SPs not able to create SAML requests -->
 	<entry key="eidas.supportFramingSamlRequest">false</entry>

@@ -47,8 +47,8 @@
 
 	<!-- providers -->
 	<entry key="external.authentication">yes</entry>
-	<entry key="idp.url">http://idp:8888/IdP/AuthenticateCitizen</entry>
-	<entry key="idp.metadata.url">http://idp:8888/IdP/metadata</entry>
+	<entry key="idp.url">http://192.168.89.132:8080/IdP/AuthenticateCitizen</entry>
+	<entry key="idp.metadata.url">http://192.168.89.132:8080/IdP/metadata</entry>
 	<!-- derivation -->
 	<entry key="deriveAttr.number">5</entry>
 	<entry key="deriveAttr1.id">isAgeOver</entry>

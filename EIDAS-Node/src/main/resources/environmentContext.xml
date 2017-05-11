@@ -23,7 +23,7 @@
 -->
     <!-- Defining the eidasConfigRepository using a plain String -->
     <bean id="eidasConfigRepository" class="java.lang.String">
-        <constructor-arg value="c:/pgm/projects/configEidas/glassfish/"/>
+        <constructor-arg value="/home/daniele/Documenti/EIDAS-Config/"/>
 	</bean>
 
 </beans>
