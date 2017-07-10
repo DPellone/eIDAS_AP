@@ -29,10 +29,13 @@
 
    <!-- MOD -->
    <!-- Default configuration: SAML2 SSO requiring signing and encrypting -->
+
+   <!-- PostAuthnFlow: mio interceptor -->
     <bean id="shibboleth.DefaultRelyingParty" parent="RelyingParty">
         <property name="profileConfigurations">
             <list>
-                <bean parent="SAML2.SSO" p:authenticationFlows="#{{'Password'}}" p:signAssertions="true" p:encryptAssertions="true" />
+                <bean parent="SAML2.SSO" p:authenticationFlows="#{{'Password'}}" p:postAuthenticationFlows="eidasReleaseAttributes" p:signAssertions="true" p:encryptAssertions="true" />
+
             </list>
         </property>
     </bean>

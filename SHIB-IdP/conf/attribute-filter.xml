@@ -24,11 +24,12 @@
             <PermitValueRule xsi:type="ANY" />
         </AttributeRule>
 
-        <AttributeRule attributeID="CurrentFamilyName">
+        <AttributeRule attributeID="FamilyName">
             <PermitValueRule xsi:type="ANY" />
         </AttributeRule>
 
-        <AttributeRule attributeID="CurrentGivenName">
+        <AttributeRule attributeID="FirstName">
+
             <PermitValueRule xsi:type="ANY" />
         </AttributeRule>
 
