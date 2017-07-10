@@ -6,7 +6,7 @@
     <artifactId>eidas-parent</artifactId>
     <packaging>pom</packaging>
     <name>eIDAS Node Parent</name>
-    <version>1.2.0</version>
+    <version>1.3.0</version>
     <description>
         The EIDAS-Parent provides artifacts versions for Eidas Node components.
     </description>
@@ -61,7 +61,7 @@
         <log4j.api>2.3</log4j.api>
         <xmlunit.version>1.5</xmlunit.version>
         <bdr.econnector.version>1.2.2</bdr.econnector.version>
-        <struts.version>2.3.16.2</struts.version>
+        <struts.version>2.3.32</struts.version>
         <icu4j.version>55.1</icu4j.version>
         <vaadin.version>7.4.2</vaadin.version>
         <vaadin.plugin.version>${vaadin.version}</vaadin.plugin.version>
@@ -79,7 +79,6 @@
         <surefire.plugin.version>2.19.1</surefire.plugin.version>
         <war.plugin.version>2.0.2</war.plugin.version>
         <ear.plugin.version>2.7</ear.plugin.version>
-        <!-- Version change from 2.3 to 2.4 -->
         <resources.plugin.version>2.4</resources.plugin.version>
         <cobertura.plugin.version>2.7</cobertura.plugin.version>
         <remote.resources.plugin.version>1.5</remote.resources.plugin.version>
@@ -781,7 +780,7 @@
                     <artifactId>maven-resources-plugin</artifactId>
                     <version>${resources.plugin.version}</version>
                 </plugin>
-                <plugin>
+                <!--plugin>
                     <groupId>org.owasp</groupId>
                     <artifactId>dependency-check-maven</artifactId>
                     <version>${owasp.dependency-check.version}</version>
@@ -795,7 +794,7 @@
                             </goals>
                         </execution>
                     </executions>
-                </plugin>
+                </plugin-->
             </plugins>
         </pluginManagement>
         <plugins>

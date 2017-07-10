@@ -35,7 +35,6 @@
                     eIDASNodeSecurity appender      : INFO
 -->
 
-
 <configuration scan="true" scanPeriod="30 minutes">
 
     <!--
