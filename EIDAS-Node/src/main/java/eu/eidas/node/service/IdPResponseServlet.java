@@ -115,9 +115,13 @@ public final class IdPResponseServlet extends AbstractServiceServlet {
 
     private void execute(HttpServletRequest request, HttpServletResponse response)
             throws IOException, ServletException {
-        try {
-
-            RequestDispatcher dispatcher = getServletContext().getRequestDispatcher(handleExecute(request, response));
+        try {// --- MOD ---
+        	String url = handleExecute(request, response);
+        	if(url == null){
+        		getLogger().info("Niente attributi!");
+        		return;
+        	}
+            RequestDispatcher dispatcher = getServletContext().getRequestDispatcher(url);
             dispatcher.forward(request, response);
             HttpSession session = request.getSession(false);
             if (null != session
@@ -150,10 +154,11 @@ public final class IdPResponseServlet extends AbstractServiceServlet {
             // Illegal state: no error AND no success response received from the specific
             throw new ServletException("Unable to process specific response: " + e, e);
         }
-        if (null == lightResponse) {
-            getLogger().error("SpecificException: Missing specific response");
+        if (null == lightResponse) { //--- MOD ---
+            //getLogger().error("SpecificException: Missing specific response");
             // Illegal state: no error AND no success response received from the specific
-            throw new ServletException("Missing specific response: no error and no success");
+            //throw new ServletException("Missing specific response: no error and no success");
+        	return null;
         }
 
         HttpSession session = request.getSession();

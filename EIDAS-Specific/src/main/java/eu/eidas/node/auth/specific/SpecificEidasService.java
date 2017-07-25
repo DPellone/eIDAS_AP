@@ -228,7 +228,7 @@ public final class SpecificEidasService implements IAUService {
 
             StoredAuthenticationRequest specificRequest = specificIdpRequestCorrelationMap.get(specificRequestId);
             //clean up
-            specificIdpRequestCorrelationMap.remove(specificRequestId);
+            //specificIdpRequestCorrelationMap.remove(specificRequestId);
 
             if (null == specificRequest) {
                 LOG.info("BUSINESS EXCEPTION : Session is missing or invalid!");

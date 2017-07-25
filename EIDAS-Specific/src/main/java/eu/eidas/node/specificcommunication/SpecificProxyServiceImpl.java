@@ -1,6 +1,12 @@
 package eu.eidas.node.specificcommunication;
 
 import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import javax.annotation.Nonnull;
@@ -8,9 +14,30 @@ import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.xml.parsers.*;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactoryConfigurationError;
 
+import org.w3c.dom.*;
+import org.opensaml.saml2.core.AuthnRequest;
+import org.opensaml.saml2.core.Issuer;
+import org.opensaml.saml2.core.NameID;
+import org.opensaml.saml2.core.Subject;
+import org.opensaml.saml2.core.SubjectConfirmation;
+import org.opensaml.saml2.core.impl.AuthnRequestBuilder;
+import org.opensaml.saml2.core.impl.AuthnRequestMarshaller;
+import org.opensaml.saml2.core.impl.IssuerBuilder;
+import org.opensaml.saml2.core.impl.NameIDBuilder;
+import org.opensaml.saml2.core.impl.SubjectBuilder;
+import org.opensaml.saml2.core.impl.SubjectConfirmationBuilder;
+import org.opensaml.xml.io.MarshallingException;
+import org.opensaml.xml.util.XMLHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import eu.eidas.auth.commons.EIDASStatusCode;
 import eu.eidas.auth.commons.EidasErrorKey;
@@ -18,7 +45,9 @@ import eu.eidas.auth.commons.EidasErrors;
 import eu.eidas.auth.commons.EidasParameterKeys;
 import eu.eidas.auth.commons.EidasStringUtil;
 import eu.eidas.auth.commons.IncomingRequest;
+import eu.eidas.auth.commons.attribute.AttributeDefinition;
 import eu.eidas.auth.commons.attribute.ImmutableAttributeMap;
+import eu.eidas.auth.commons.attribute.PersonType;
 import eu.eidas.auth.commons.light.ILightRequest;
 import eu.eidas.auth.commons.light.ILightResponse;
 import eu.eidas.auth.commons.light.impl.LightResponse;
@@ -30,6 +59,7 @@ import eu.eidas.auth.commons.tx.AuthenticationExchange;
 import eu.eidas.auth.commons.tx.CorrelationMap;
 import eu.eidas.auth.commons.tx.StoredLightRequest;
 import eu.eidas.auth.commons.validation.NormalParameterValidator;
+import eu.eidas.auth.engine.xml.opensaml.SAMLEngineUtils;
 import eu.eidas.auth.specific.IAUService;
 import eu.eidas.node.CitizenAuthenticationBean;
 import eu.eidas.node.SpecificIdPBean;
@@ -52,13 +82,15 @@ import static eu.eidas.node.SpecificServletHelper.getHttpRequestParameters;
  */
 public class SpecificProxyServiceImpl implements ISpecificProxyService {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(SpecificProxyServiceImpl.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(SpecificProxyServiceImpl.class);
 
     private CitizenAuthenticationBean citizenAuthentication;
 
     private boolean signResponseAssertion;
 
     private SpecificIdPBean specificIdPResponse;
+    
+    static private Map<String, IAuthenticationResponse> incompleteResponses = Collections.synchronizedMap(new HashMap<String, IAuthenticationResponse>());
 
     public CitizenAuthenticationBean getCitizenAuthentication() {
         return citizenAuthentication;
@@ -84,6 +116,14 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
         this.specificIdPResponse = specificIdPResponse;
     }
 
+    public Map<String, IAuthenticationResponse> getIncompleteResponses() {
+    	return incompleteResponses;
+    }
+    
+    public void setIncompleteResponses(Map<String, IAuthenticationResponse> incompleteResponses) {
+    	this.incompleteResponses = incompleteResponses;
+    }
+    
     @Override
     public void sendRequest(@Nonnull ILightRequest lightRequest,
                             @Nonnull HttpServletRequest httpServletRequest,
@@ -181,8 +221,9 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
                                             specificResponse.getLevelOfAssurance());
 
             ImmutableAttributeMap requestedAttributes = specificAuthnRequest.getRequestedAttributes();
+            boolean partialResponse = incompleteResponses.containsKey(specificResponse.getInResponseToId());
 
-            if (!isAttributeListValid(specificService, requestedAttributes, specificResponse.getAttributes())) {
+            if (!partialResponse && !isAttributeListValid(specificService, requestedAttributes, specificResponse.getAttributes())) {
 
                 String errorCode = EidasErrors.get(EidasErrorKey.INVALID_ATTRIBUTE_LIST.errorCode());
                 String errorMessage = EidasErrors.get(EidasErrorKey.INVALID_ATTRIBUTE_LIST.errorMessage());
@@ -196,19 +237,143 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
                         .inResponseTo(proxyServiceAuthnRequest.getId())
                         .build();
 
-            } else {
-                ILightRequest proxyServiceAuthnRequest = proxyServiceRequest.getRequest();
-                authenticationResponse = AuthenticationResponse.builder(specificResponse)
-                        .inResponseTo(proxyServiceAuthnRequest.getId())
-                        .build();
+            } else { // --- MOD ---
+            	// La risposta di authN è valida, bisogna controllare se sono presenti tutti gli attributi richiesti
+            	ImmutableAttributeMap gatheredAttributes;
+            	if(partialResponse)
+            		gatheredAttributes = ImmutableAttributeMap.builder()
+            		.putAll(specificResponse.getAttributes())
+            		.putAll(incompleteResponses.get(specificResponse.getInResponseToId()).getAttributes()).build();
+            	else
+            		gatheredAttributes = ImmutableAttributeMap.builder()
+            		.putAll(specificResponse.getAttributes()).build();
+            	
+            	List<AttributeDefinition<?>> missingAttributes = getMissingAttributes(requestedAttributes, gatheredAttributes);
+            	
+            	if(missingAttributes == null){
+            		if(partialResponse){
+		                ILightRequest proxyServiceAuthnRequest = proxyServiceRequest.getRequest();
+		                authenticationResponse = AuthenticationResponse.builder(incompleteResponses.remove(specificResponse.getInResponseToId()))
+		                		.attributes(gatheredAttributes)
+		                        .inResponseTo(proxyServiceAuthnRequest.getId())
+		                        .build();
+            		} else {
+            			ILightRequest proxyServiceAuthnRequest = proxyServiceRequest.getRequest();
+		                authenticationResponse = AuthenticationResponse.builder(specificResponse)
+		                        .inResponseTo(proxyServiceAuthnRequest.getId())
+		                        .build();
+            		}
+                
+            	} else {// Attributi mancanti
+            		
+            		String message = "Attributi mancanti";
+            		try {
+            			
+						HttpURLConnection webServiceRequest = (HttpURLConnection) new URL("http://192.168.89.1:8080/DPellone/APMapping/1.0.0/attributeProviders").openConnection();
+						if(webServiceRequest.getResponseCode() != 200){
+							authenticationResponse = AuthenticationResponse.builder(specificResponse)
+		            				.failure(true)
+		            				.statusCode(EidasErrors.get(EidasErrorKey.INVALID_ATTRIBUTE_LIST.errorCode()))
+		            				.statusMessage(String.valueOf(webServiceRequest.getResponseCode()))
+		            				.inResponseTo(proxyServiceRequest.getRequest().getId())
+		            				.build();
+							specificService.getProxyServiceRequestCorrelationMap().remove(specificAuthnRequest.getId());
+							specificService.getSpecificIdpRequestCorrelationMap().remove(specificResponse.getInResponseToId());
+							return LightResponse.builder(authenticationResponse).build();
+						}
+						
+						ObjectMapper parser = new ObjectMapper();
+						JsonNode APList = parser.readTree(webServiceRequest.getInputStream());
+						String APid = APList.findValuesAsText("id").get(0);
+						
+						webServiceRequest = (HttpURLConnection) new URL("http://192.168.89.1:8080/DPellone/APMapping/1.0.0/attributeProviders/mapping?apid=" + APid).openConnection();
+						if(webServiceRequest.getResponseCode() != 200){
+							authenticationResponse = AuthenticationResponse.builder(specificResponse)
+		            				.failure(true)
+		            				.statusCode(EidasErrors.get(EidasErrorKey.INVALID_ATTRIBUTE_LIST.errorCode()))
+		            				.statusMessage(String.valueOf(webServiceRequest.getResponseCode()))
+		            				.inResponseTo(proxyServiceRequest.getRequest().getId())
+		            				.build();
+							specificService.getProxyServiceRequestCorrelationMap().remove(specificAuthnRequest.getId());
+							specificService.getSpecificIdpRequestCorrelationMap().remove(specificResponse.getInResponseToId());
+							return LightResponse.builder(authenticationResponse).build();
+						}
+						
+						List<StringToken> syntax = parser.readValue(webServiceRequest.getInputStream(), new TypeReference<List<StringToken>>(){});
+						IDBuilder newIdBuilder = new IDBuilder(syntax, specificResponse.getAttributes());
+						String newID = newIdBuilder.getID();
+						
+						String requestId = specificResponse.getInResponseToId();
+						authenticationResponse = AuthenticationResponse.builder(specificResponse)
+		                        .inResponseTo(proxyServiceRequest.getRequest().getId())
+		                        .build();
+						incompleteResponses.put(requestId, authenticationResponse);
+						
+						byte[] apMessage = createSamlAuthNRequest(requestId,
+								citizenAuthentication.getSpecAuthenticationNode().getCallBackURL(),
+								"http://192.168.89.134:8080/EidasNode/ServiceRequesterMetadata",
+								newID);
+						
+						String samlToken = EidasStringUtil.encodeToBase64(apMessage);
+						httpServletRequest.setAttribute(EidasParameterKeys.BINDING.toString(), EidasSamlBinding.POST.getName());
+		                httpServletRequest.setAttribute(SpecificParameterNames.SAML_TOKEN.toString(), samlToken);
+		                httpServletRequest.setAttribute("apUrl", "http://192.168.89.133/idp/profile/SAML2/POST/SSO");
+		                RequestDispatcher dispatcher = httpServletRequest.getRequestDispatcher("/internal/apRedirect.jsp");
+		                dispatcher.forward(httpServletRequest, httpServletResponse);
+		                
+		                return null;
+						
+					} catch (Exception e) {
+						LOGGER.error(e.getMessage());
+					}
+            		authenticationResponse = AuthenticationResponse.builder(specificResponse)
+            				.failure(true)
+            				.statusCode(EidasErrors.get(EidasErrorKey.INVALID_ATTRIBUTE_LIST.errorCode()))
+            				.statusMessage(message)
+            				.inResponseTo(proxyServiceRequest.getRequest().getId())
+            				.build();
+            	}
 
             }
         }
+        specificService.getProxyServiceRequestCorrelationMap().remove(specificAuthnRequest.getId());
+        specificService.getSpecificIdpRequestCorrelationMap().remove(specificResponse.getInResponseToId());
         //build the LightResponse
         return LightResponse.builder(authenticationResponse).build();
     }
+    
+    
+    // --- MOD ---
+    private byte[] createSamlAuthNRequest(String ID, String callBackURL, String issuer, String nameID) throws ParserConfigurationException, TransformerFactoryConfigurationError, TransformerException, MarshallingException {
+    	AuthnRequest samlRequest = new AuthnRequestBuilder().buildObject();
+    	
+    	samlRequest.setID(ID);
+    	samlRequest.setProtocolBinding("urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST");
+    	samlRequest.setIssueInstant(SAMLEngineUtils.getCurrentTime());
+    	samlRequest.setAssertionConsumerServiceURL(callBackURL);
+    	
+    	Issuer iss = new IssuerBuilder().buildObject();
+    	iss.setValue(issuer);
+    	samlRequest.setIssuer(iss);
+    	
+    	NameID nameId = new NameIDBuilder().buildObject();
+    	nameId.setValue(nameID);
+    	
+    	SubjectConfirmation subjectConfirmation = new SubjectConfirmationBuilder().buildObject();
+    	subjectConfirmation.setMethod("urn:oasis:names:tc:SAML:2.0:cm:bearer");
+    	subjectConfirmation.setNameID(nameId);
+    	
+    	Subject subject = new SubjectBuilder().buildObject();
+    	subject.getSubjectConfirmations().add(subjectConfirmation);
+    	samlRequest.setSubject(subject);
+    	
+    	Element samlMessage = new AuthnRequestMarshaller().marshall(samlRequest);
+    	String xmlString = XMLHelper.nodeToString(samlMessage);
+    	
+		return xmlString.getBytes();
+	}
 
-    @Override
+	@Override
     public void setResponseCallbackHandler(@Nonnull IResponseCallbackHandler responseCallbackHandler) {
         throw new UnsupportedOperationException("Not implemented!");
     }
@@ -250,11 +415,25 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
                             + "\"");
         }
         //clean up
-        proxyServiceRequestCorrelationMap.remove(specificAuthnRequest.getId());
+        //proxyServiceRequestCorrelationMap.remove(specificAuthnRequest.getId());
 
         return proxyServiceRequest;
     }
 
+    private List<AttributeDefinition<?>> getMissingAttributes(ImmutableAttributeMap requestedA, ImmutableAttributeMap responseA){
+    	List<AttributeDefinition<?>> missingAttributes = null;
+    	for (final AttributeDefinition<?> attributeDefinition : requestedA.getDefinitions()) {
+			if(!(responseA.getDefinitions().contains(attributeDefinition))
+					&& !PersonType.REPV_LEGAL_PERSON.equals(attributeDefinition.getPersonType())
+                    && !PersonType.REPV_NATURAL_PERSON.equals(attributeDefinition.getPersonType())){
+				if(missingAttributes == null)
+					missingAttributes = new ArrayList<AttributeDefinition<?>>();
+				missingAttributes.add(attributeDefinition);
+			}
+		}
+    	return missingAttributes;
+    }
+    
     private boolean isAttributeListValid(IAUService specificService,
                                          ImmutableAttributeMap requestedAttributes,
                                          ImmutableAttributeMap responseAttributes) {
