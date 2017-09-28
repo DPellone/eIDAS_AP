@@ -23,6 +23,9 @@
 package eu.eidas.node.service;
 
 import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,6 +34,9 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Sets;
 
 import org.apache.commons.lang.StringUtils;
@@ -169,6 +175,10 @@ public class ColleagueRequestServlet extends AbstractServiceServlet {
 
         request.setAttribute(NodeParameterNames.REQUEST_ID.toString(), authData.getId());
         request.setAttribute(NodeParameterNames.COLLEAGUE_REQUEST.toString(), authData);
+        
+        // --- MOD ---
+        // recupero lista AP
+        request.setAttribute("apList", getAttributeProviderList());
 
         NodeViewNames forwardUrl;
         if (controllerService.isAskConsentType()) {
@@ -178,5 +188,49 @@ public class ColleagueRequestServlet extends AbstractServiceServlet {
         }
         RequestDispatcher dispatcher = request.getRequestDispatcher(forwardUrl.toString());
         dispatcher.forward(request, response);
+    }
+    
+    // --- MOD ---
+    public class AttributeProviderInfo{
+    	public String getId() {
+			return id;
+		}
+		public void setId(String id) {
+			this.id = id;
+		}
+		public String getName() {
+			return name;
+		}
+		public void setName(String name) {
+			this.name = name;
+		}
+		public AttributeProviderInfo(String id, String name){
+			this.id = id;
+			this.name = name;
+		}
+		private String id;
+    	private String name;
+    }
+    
+    private List<AttributeProviderInfo> getAttributeProviderList() {
+    	List<AttributeProviderInfo> list = new ArrayList<AttributeProviderInfo>();
+    	try {
+			HttpURLConnection webServiceRequest = (HttpURLConnection) new URL("http://192.168.89.1:8080/DPellone/APMapping/1.0.0/attributeProviders").openConnection();
+			if(webServiceRequest.getResponseCode() == 200){
+				ObjectMapper parser = new ObjectMapper();
+				JsonNode APList = parser.readTree(webServiceRequest.getInputStream());
+				for (JsonNode node : APList) {
+					list.add(new AttributeProviderInfo(node.get("id").asText(), node.get("name").asText()));
+				}
+			}
+		} catch (MalformedURLException e) {
+			LOG.warn(e.getMessage());
+		} catch (JsonProcessingException e) {
+			LOG.warn(e.getMessage());
+		} catch (IOException e) {
+			LOG.warn(e.getMessage());
+		}
+		
+		return list;
     }
 }

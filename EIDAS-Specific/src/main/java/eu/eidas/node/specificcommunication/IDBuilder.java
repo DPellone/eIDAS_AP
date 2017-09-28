@@ -11,6 +11,8 @@ import com.google.common.collect.ImmutableSet;
 import eu.eidas.auth.commons.attribute.AttributeDefinition;
 import eu.eidas.auth.commons.attribute.ImmutableAttributeMap;
 
+
+// --- MOD ---
 public class IDBuilder {
 	
 	private ImmutableAttributeMap attributes;

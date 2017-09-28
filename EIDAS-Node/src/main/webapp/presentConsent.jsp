@@ -175,7 +175,18 @@
                                                 </li>
                                             </c:if>
                                             </c:forEach>
-                                            <c:if test="${categoryIsDisplayed=='true'}"></ul></c:if>
+                                            <c:if test="${categoryIsDisplayed=='true'}">
+                                                </ul>
+                                                <div>
+                                                    <h5>Select the Attribute Provider</h5>
+                                                    <select id="apSelector" name="__apSelector">
+                                                      <option value="null">No Attribute Provider</option>
+                                                      <c:forEach items="${apList}" var="ap">
+                                                        <option value="${ap.id}">${ap.name}</option>
+                                                      </c:forEach>
+                                                    </select>
+                                                </div>
+                                            </c:if>
                                     </div>
                                     <div class="col-sm-6"> <% /** Legal person */ %>
                                         <c:set var="categoryIsDisplayed" value="false"/>

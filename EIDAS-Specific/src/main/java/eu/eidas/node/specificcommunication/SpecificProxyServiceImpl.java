@@ -59,6 +59,7 @@ import eu.eidas.auth.commons.tx.AuthenticationExchange;
 import eu.eidas.auth.commons.tx.CorrelationMap;
 import eu.eidas.auth.commons.tx.StoredLightRequest;
 import eu.eidas.auth.commons.validation.NormalParameterValidator;
+import eu.eidas.auth.engine.SamlEngine;
 import eu.eidas.auth.engine.xml.opensaml.SAMLEngineUtils;
 import eu.eidas.auth.specific.IAUService;
 import eu.eidas.node.CitizenAuthenticationBean;
@@ -90,8 +91,12 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
 
     private SpecificIdPBean specificIdPResponse;
     
+    // --- MOD ---
+    // Lista delle risposte per cui mancano degli attributi
     static private Map<String, IAuthenticationResponse> incompleteResponses = Collections.synchronizedMap(new HashMap<String, IAuthenticationResponse>());
-
+    // Lista dei mapping richiesta-AP
+    static private Map<String, String> requestAttributeProviderCorrelationMap = Collections.synchronizedMap(new HashMap<String, String>());
+    
     public CitizenAuthenticationBean getCitizenAuthentication() {
         return citizenAuthentication;
     }
@@ -160,10 +165,17 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
                 parameters.put(EidasParameterKeys.EIDAS_NAMEID_FORMAT.toString(), lightRequest.getNameIdFormat());
 
                 parameters.put(EidasParameterKeys.SERVICE_PROVIDER_TYPE.toString(), lightRequest.getSpType());
-
+                
                 byte[] samlTokenBytes = specificService.prepareCitizenAuthentication(lightRequest, attrMap, parameters,
                                                                                      getHttpRequestAttributesHeaders(
                                                                                              httpServletRequest));
+
+                // --- MOD ---
+                // Memorizzazione AP associato alla richiesta
+                requestAttributeProviderCorrelationMap.put((String)parameters.get("EidasID"), (String)parameters.get("__apSelector"));
+                LOGGER.error("EidasID: " + (String)parameters.get("EidasID"));
+                LOGGER.error("__apSelector: " + (String)parameters.get("__apSelector"));
+
                 // used by jsp
                 String samlToken = EidasStringUtil.encodeToBase64(samlTokenBytes);
 
@@ -269,7 +281,24 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
             		String message = "Attributi mancanti";
             		try {
             			
-						HttpURLConnection webServiceRequest = (HttpURLConnection) new URL("http://192.168.89.1:8080/DPellone/APMapping/1.0.0/attributeProviders").openConnection();
+            			String APid = requestAttributeProviderCorrelationMap.get(specificResponse.getInResponseToId());
+            			LOGGER.error("AP: " + APid);
+            			LOGGER.error("ID: " + specificResponse.getInResponseToId());
+						if(APid == null || APid == "null"){
+							authenticationResponse = AuthenticationResponse.builder(specificResponse)
+		            				.failure(true)
+		            				.statusCode(EidasErrors.get(EidasErrorKey.INVALID_ATTRIBUTE_LIST.errorCode()))
+		            				.statusMessage("No AP provided")
+		            				.inResponseTo(proxyServiceRequest.getRequest().getId())
+		            				.build();
+							specificService.getProxyServiceRequestCorrelationMap().remove(specificAuthnRequest.getId());
+							specificService.getSpecificIdpRequestCorrelationMap().remove(specificResponse.getInResponseToId());
+							requestAttributeProviderCorrelationMap.remove(specificResponse.getInResponseToId());
+							return LightResponse.builder(authenticationResponse).build();
+						}
+						
+						HttpURLConnection webServiceRequest = (HttpURLConnection) new URL("http://192.168.89.1:8080/DPellone/APMapping/1.0.0/attributeProviders/mapping?apid=" + APid).openConnection();
+
 						if(webServiceRequest.getResponseCode() != 200){
 							authenticationResponse = AuthenticationResponse.builder(specificResponse)
 		            				.failure(true)
@@ -279,30 +308,16 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
 		            				.build();
 							specificService.getProxyServiceRequestCorrelationMap().remove(specificAuthnRequest.getId());
 							specificService.getSpecificIdpRequestCorrelationMap().remove(specificResponse.getInResponseToId());
+							requestAttributeProviderCorrelationMap.remove(specificResponse.getInResponseToId());
 							return LightResponse.builder(authenticationResponse).build();
 						}
 						
 						ObjectMapper parser = new ObjectMapper();
-						JsonNode APList = parser.readTree(webServiceRequest.getInputStream());
-						String APid = APList.findValuesAsText("id").get(0);
-						
-						webServiceRequest = (HttpURLConnection) new URL("http://192.168.89.1:8080/DPellone/APMapping/1.0.0/attributeProviders/mapping?apid=" + APid).openConnection();
-						if(webServiceRequest.getResponseCode() != 200){
-							authenticationResponse = AuthenticationResponse.builder(specificResponse)
-		            				.failure(true)
-		            				.statusCode(EidasErrors.get(EidasErrorKey.INVALID_ATTRIBUTE_LIST.errorCode()))
-		            				.statusMessage(String.valueOf(webServiceRequest.getResponseCode()))
-		            				.inResponseTo(proxyServiceRequest.getRequest().getId())
-		            				.build();
-							specificService.getProxyServiceRequestCorrelationMap().remove(specificAuthnRequest.getId());
-							specificService.getSpecificIdpRequestCorrelationMap().remove(specificResponse.getInResponseToId());
-							return LightResponse.builder(authenticationResponse).build();
-						}
-						
-						List<StringToken> syntax = parser.readValue(webServiceRequest.getInputStream(), new TypeReference<List<StringToken>>(){});
+						JsonNode APInfo = parser.readTree(webServiceRequest.getInputStream());
+						String APurl = APInfo.get("url").asText();
+						List<StringToken> syntax = parser.readValue(APInfo.get("token").traverse(), new TypeReference<List<StringToken>>(){});
 						IDBuilder newIdBuilder = new IDBuilder(syntax, specificResponse.getAttributes());
 						String newID = newIdBuilder.getID();
-						
 						String requestId = specificResponse.getInResponseToId();
 						authenticationResponse = AuthenticationResponse.builder(specificResponse)
 		                        .inResponseTo(proxyServiceRequest.getRequest().getId())
@@ -317,7 +332,7 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
 						String samlToken = EidasStringUtil.encodeToBase64(apMessage);
 						httpServletRequest.setAttribute(EidasParameterKeys.BINDING.toString(), EidasSamlBinding.POST.getName());
 		                httpServletRequest.setAttribute(SpecificParameterNames.SAML_TOKEN.toString(), samlToken);
-		                httpServletRequest.setAttribute("apUrl", "http://192.168.89.133/idp/profile/SAML2/POST/SSO");
+		                httpServletRequest.setAttribute("apUrl", APurl);
 		                RequestDispatcher dispatcher = httpServletRequest.getRequestDispatcher("/internal/apRedirect.jsp");
 		                dispatcher.forward(httpServletRequest, httpServletResponse);
 		                
@@ -338,6 +353,7 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
         }
         specificService.getProxyServiceRequestCorrelationMap().remove(specificAuthnRequest.getId());
         specificService.getSpecificIdpRequestCorrelationMap().remove(specificResponse.getInResponseToId());
+		    requestAttributeProviderCorrelationMap.remove(specificResponse.getInResponseToId());
         //build the LightResponse
         return LightResponse.builder(authenticationResponse).build();
     }

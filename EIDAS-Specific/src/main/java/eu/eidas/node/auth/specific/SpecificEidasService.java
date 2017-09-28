@@ -201,9 +201,15 @@ public final class SpecificEidasService implements IAUService {
         String eidasNameidFormat = (String) parameters.get(EidasParameterKeys.EIDAS_NAMEID_FORMAT.toString());
         String serviceProviderType = (String) parameters.get(EidasParameterKeys.SERVICE_PROVIDER_TYPE.toString());
 
-        return generateAuthenticationRequest(lightRequest, modifiedRequestedAttributes, destination,
+        IRequestMessage request = generateAuthenticationRequest(lightRequest, modifiedRequestedAttributes, destination,
                 eidasLoa, eidasNameidFormat, citizenCountryCode, citizenIpAddress,
                 serviceProviderName, serviceProviderType);
+        
+        // --- MOD ---
+        // Passaggio dell'identificativo per collegare richiesta e AP selezionato
+        parameters.put("EidasID", request.getRequest().getId());
+        
+        return request.getMessageBytes();
     }
 
     /**
@@ -344,7 +350,7 @@ public final class SpecificEidasService implements IAUService {
      * @param modifiedRequestedAttributes request these from IdP
      * @return byte[] containing the SAML Request.
      */
-    private byte[] generateAuthenticationRequest(ILightRequest lightRequest,
+    private IRequestMessage generateAuthenticationRequest(ILightRequest lightRequest,
                                                  ImmutableAttributeMap modifiedRequestedAttributes,
                                                  String destination,
                                                  String eidasLoa,
@@ -392,7 +398,7 @@ public final class SpecificEidasService implements IAUService {
                     new StoredAuthenticationRequest.Builder().request(generatedRequest)
                             .remoteIpAddress(citizenIpAddress)
                             .build());
-            return generatedSpecificRequest.getMessageBytes();
+            return generatedSpecificRequest;
 
         } catch (EIDASSAMLEngineException e) {
             LOG.info("Error generating SAML Token for Authentication Request", e.getMessage());
