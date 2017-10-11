@@ -16,10 +16,28 @@ import java.net.URI;
 import java.util.Map;
 import java.util.Properties;
 
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactoryConfigurationError;
+
 import eu.eidas.auth.commons.attribute.PersonType;
 import org.apache.commons.lang.StringUtils;
+import org.opensaml.saml2.core.AuthnRequest;
+import org.opensaml.saml2.core.Issuer;
+import org.opensaml.saml2.core.NameID;
+import org.opensaml.saml2.core.Subject;
+import org.opensaml.saml2.core.impl.AuthnRequestBuilder;
+import org.opensaml.saml2.core.impl.AuthnRequestMarshaller;
+import org.opensaml.saml2.core.impl.IssuerBuilder;
+import org.opensaml.saml2.core.impl.NameIDBuilder;
+import org.opensaml.saml2.core.impl.SubjectBuilder;
+import org.opensaml.saml2.metadata.EntityDescriptor;
+import org.opensaml.saml2.metadata.SingleSignOnService;
+import org.opensaml.xml.io.MarshallingException;
+import org.opensaml.xml.util.XMLHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.w3c.dom.Element;
 
 import eu.eidas.auth.commons.EIDASValues;
 import eu.eidas.auth.commons.EidasErrorKey;
@@ -50,7 +68,8 @@ import eu.eidas.auth.engine.ProtocolEngineI;
 import eu.eidas.auth.engine.xml.opensaml.SAMLEngineUtils;
 import eu.eidas.auth.specific.IAUService;
 import eu.eidas.engine.exceptions.EIDASSAMLEngineException;
-
+import eu.eidas.auth.engine.metadata.MetadataSignerI;
+import eu.eidas.auth.engine.metadata.impl.CachingMetadataFetcher;
 /**
  * This class is specific and should be modified by each member state if they want to use any different settings.
  */
@@ -86,7 +105,9 @@ public final class SpecificEidasService implements IAUService {
     private CorrelationMap<StoredAuthenticationRequest> specificIdpRequestCorrelationMap;
 
     private String idpMetadataUrl;
-
+    
+    private static CachingMetadataFetcher metadataFetcher = new CachingMetadataFetcher();
+    
     public ProtocolEngineFactory getProtocolEngineFactory() {
         return protocolEngineFactory;
     }
@@ -183,6 +204,54 @@ public final class SpecificEidasService implements IAUService {
     public void setIdpMetadataUrl(String idpMetadataUrl) {
         this.idpMetadataUrl = idpMetadataUrl;
     }
+    
+    // --- MOD ---
+    public byte[] createSamlAuthNRequest(String ID, String callBackURL, String issuer, String nameID, String APurl, StringBuilder endpoint)
+    		throws ParserConfigurationException, TransformerFactoryConfigurationError, TransformerException, MarshallingException, EIDASSAMLEngineException {
+    	
+    	if(!metadataFetcher.isHttpRetrievalEnabled())
+    		metadataFetcher.setHttpRetrievalEnabled(true);
+    	
+    	EntityDescriptor metadata = metadataFetcher.getEntityDescriptor(APurl, (MetadataSignerI) getProtocolEngine().getSigner());
+    	String ep = null;
+    	for (SingleSignOnService ssoService : metadata.getIDPSSODescriptor("urn:oasis:names:tc:SAML:2.0:protocol").getSingleSignOnServices()) {
+    		if(ssoService.getBinding().equals("urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST")){
+    			ep = ssoService.getLocation();
+    			break;
+    		}
+    	}
+    	
+    	if(endpoint == null)
+    		throw new EIDASSAMLEngineException("Unable to find POST endpoint for AP");
+    	else
+    		endpoint.append(ep);
+    	
+    	AuthnRequest samlRequest = new AuthnRequestBuilder().buildObject();
+    	
+    	samlRequest.setID(ID);
+    	samlRequest.setProtocolBinding("urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST");
+    	samlRequest.setIssueInstant(SAMLEngineUtils.getCurrentTime());
+    	samlRequest.setAssertionConsumerServiceURL(callBackURL);
+    	samlRequest.setDestination(ep);
+    	
+    	Issuer iss = new IssuerBuilder().buildObject();
+    	iss.setValue(issuer);
+    	samlRequest.setIssuer(iss);
+    	
+    	NameID nameId = new NameIDBuilder().buildObject();
+    	nameId.setValue(nameID);
+    	nameId.setFormat("urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified");
+    	
+    	Subject subject = new SubjectBuilder().buildObject();
+    	subject.setNameID(nameId);
+    	samlRequest.setSubject(subject);
+    	AuthnRequest signedRequest = getProtocolEngine().getSigner().sign(samlRequest);
+    	
+    	Element samlMessage = new AuthnRequestMarshaller().marshall(signedRequest);
+    	String xmlString = XMLHelper.nodeToString(samlMessage);
+    	
+		return xmlString.getBytes();
+	}
 
     /**
      * {@inheritDoc}

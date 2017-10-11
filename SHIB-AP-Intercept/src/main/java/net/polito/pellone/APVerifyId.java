@@ -34,14 +34,12 @@ public class APVerifyId extends ProfileInterceptorFlowDescriptor {
 		Object messageObj = input.getInboundMessageContext().getMessage();
 		if(messageObj instanceof AuthnRequest){
 			AuthnRequest message = (AuthnRequest)messageObj;
-			SubjectConfirmation subj =  message.getSubject().getSubjectConfirmations().get(0);
-			requestedId = subj.getNameID().getValue();
+			requestedId = message.getSubject().getNameID().getValue();
 		} else
 			return false;
 		
 		authenticatedId = input.getSubcontext(SubjectContext.class).getPrincipalName();
 		
-		//authenticatedId = getAuthID(request);
 		log.error("req: " + requestedId);
 		log.error("auth: " + authenticatedId);
 		if(authenticatedId.equals(requestedId))

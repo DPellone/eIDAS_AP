@@ -215,7 +215,7 @@ public class ColleagueRequestServlet extends AbstractServiceServlet {
     private List<AttributeProviderInfo> getAttributeProviderList() {
     	List<AttributeProviderInfo> list = new ArrayList<AttributeProviderInfo>();
     	try {
-			HttpURLConnection webServiceRequest = (HttpURLConnection) new URL("http://192.168.89.1:8080/DPellone/APMapping/1.0.0/attributeProviders").openConnection();
+			HttpURLConnection webServiceRequest = (HttpURLConnection) new URL(PropertiesUtil.getProperty("webservice.listURL")).openConnection();
 			if(webServiceRequest.getResponseCode() == 200){
 				ObjectMapper parser = new ObjectMapper();
 				JsonNode APList = parser.readTree(webServiceRequest.getInputStream());

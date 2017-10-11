@@ -14,24 +14,6 @@ import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.xml.parsers.*;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactoryConfigurationError;
-
-import org.w3c.dom.*;
-import org.opensaml.saml2.core.AuthnRequest;
-import org.opensaml.saml2.core.Issuer;
-import org.opensaml.saml2.core.NameID;
-import org.opensaml.saml2.core.Subject;
-import org.opensaml.saml2.core.SubjectConfirmation;
-import org.opensaml.saml2.core.impl.AuthnRequestBuilder;
-import org.opensaml.saml2.core.impl.AuthnRequestMarshaller;
-import org.opensaml.saml2.core.impl.IssuerBuilder;
-import org.opensaml.saml2.core.impl.NameIDBuilder;
-import org.opensaml.saml2.core.impl.SubjectBuilder;
-import org.opensaml.saml2.core.impl.SubjectConfirmationBuilder;
-import org.opensaml.xml.io.MarshallingException;
-import org.opensaml.xml.util.XMLHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,12 +42,12 @@ import eu.eidas.auth.commons.tx.CorrelationMap;
 import eu.eidas.auth.commons.tx.StoredLightRequest;
 import eu.eidas.auth.commons.validation.NormalParameterValidator;
 import eu.eidas.auth.engine.SamlEngine;
-import eu.eidas.auth.engine.xml.opensaml.SAMLEngineUtils;
 import eu.eidas.auth.specific.IAUService;
 import eu.eidas.node.CitizenAuthenticationBean;
 import eu.eidas.node.SpecificIdPBean;
 import eu.eidas.node.SpecificParameterNames;
 import eu.eidas.node.SpecificViewNames;
+import eu.eidas.node.auth.specific.SpecificEidasService;
 import eu.eidas.node.specificcommunication.exception.SpecificException;
 import eu.eidas.node.specificcommunication.protocol.IResponseCallbackHandler;
 
@@ -173,8 +155,6 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
                 // --- MOD ---
                 // Memorizzazione AP associato alla richiesta
                 requestAttributeProviderCorrelationMap.put((String)parameters.get("EidasID"), (String)parameters.get("__apSelector"));
-                LOGGER.error("EidasID: " + (String)parameters.get("EidasID"));
-                LOGGER.error("__apSelector: " + (String)parameters.get("__apSelector"));
 
                 // used by jsp
                 String samlToken = EidasStringUtil.encodeToBase64(samlTokenBytes);
@@ -297,7 +277,7 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
 							return LightResponse.builder(authenticationResponse).build();
 						}
 						
-						HttpURLConnection webServiceRequest = (HttpURLConnection) new URL("http://192.168.89.1:8080/DPellone/APMapping/1.0.0/attributeProviders/mapping?apid=" + APid).openConnection();
+						HttpURLConnection webServiceRequest = (HttpURLConnection) new URL(((SpecificEidasService)specificService).getServiceProperties().getProperty("webservice.mappingURL") + APid).openConnection();
 
 						if(webServiceRequest.getResponseCode() != 200){
 							authenticationResponse = AuthenticationResponse.builder(specificResponse)
@@ -314,7 +294,7 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
 						
 						ObjectMapper parser = new ObjectMapper();
 						JsonNode APInfo = parser.readTree(webServiceRequest.getInputStream());
-						String APurl = APInfo.get("url").asText();
+						String apMetadataUrl = APInfo.get("url").asText();
 						List<StringToken> syntax = parser.readValue(APInfo.get("token").traverse(), new TypeReference<List<StringToken>>(){});
 						IDBuilder newIdBuilder = new IDBuilder(syntax, specificResponse.getAttributes());
 						String newID = newIdBuilder.getID();
@@ -324,15 +304,16 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
 		                        .build();
 						incompleteResponses.put(requestId, authenticationResponse);
 						
-						byte[] apMessage = createSamlAuthNRequest(requestId,
+						StringBuilder apUrl = new StringBuilder();
+						byte[] apMessage = ((SpecificEidasService)specificService).createSamlAuthNRequest(requestId,
 								citizenAuthentication.getSpecAuthenticationNode().getCallBackURL(),
 								"http://192.168.89.134:8080/EidasNode/ServiceRequesterMetadata",
-								newID);
+								newID, apMetadataUrl, apUrl);
 						
 						String samlToken = EidasStringUtil.encodeToBase64(apMessage);
 						httpServletRequest.setAttribute(EidasParameterKeys.BINDING.toString(), EidasSamlBinding.POST.getName());
 		                httpServletRequest.setAttribute(SpecificParameterNames.SAML_TOKEN.toString(), samlToken);
-		                httpServletRequest.setAttribute("apUrl", APurl);
+		                httpServletRequest.setAttribute("apUrl", apUrl.toString());
 		                RequestDispatcher dispatcher = httpServletRequest.getRequestDispatcher("/internal/apRedirect.jsp");
 		                dispatcher.forward(httpServletRequest, httpServletResponse);
 		                
@@ -358,36 +339,6 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
         return LightResponse.builder(authenticationResponse).build();
     }
     
-    
-    // --- MOD ---
-    private byte[] createSamlAuthNRequest(String ID, String callBackURL, String issuer, String nameID) throws ParserConfigurationException, TransformerFactoryConfigurationError, TransformerException, MarshallingException {
-    	AuthnRequest samlRequest = new AuthnRequestBuilder().buildObject();
-    	
-    	samlRequest.setID(ID);
-    	samlRequest.setProtocolBinding("urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST");
-    	samlRequest.setIssueInstant(SAMLEngineUtils.getCurrentTime());
-    	samlRequest.setAssertionConsumerServiceURL(callBackURL);
-    	
-    	Issuer iss = new IssuerBuilder().buildObject();
-    	iss.setValue(issuer);
-    	samlRequest.setIssuer(iss);
-    	
-    	NameID nameId = new NameIDBuilder().buildObject();
-    	nameId.setValue(nameID);
-    	
-    	SubjectConfirmation subjectConfirmation = new SubjectConfirmationBuilder().buildObject();
-    	subjectConfirmation.setMethod("urn:oasis:names:tc:SAML:2.0:cm:bearer");
-    	subjectConfirmation.setNameID(nameId);
-    	
-    	Subject subject = new SubjectBuilder().buildObject();
-    	subject.getSubjectConfirmations().add(subjectConfirmation);
-    	samlRequest.setSubject(subject);
-    	
-    	Element samlMessage = new AuthnRequestMarshaller().marshall(samlRequest);
-    	String xmlString = XMLHelper.nodeToString(samlMessage);
-    	
-		return xmlString.getBytes();
-	}
 
 	@Override
     public void setResponseCallbackHandler(@Nonnull IResponseCallbackHandler responseCallbackHandler) {
@@ -436,6 +387,8 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
         return proxyServiceRequest;
     }
 
+    
+    // --- MOD ---
     private List<AttributeDefinition<?>> getMissingAttributes(ImmutableAttributeMap requestedA, ImmutableAttributeMap responseA){
     	List<AttributeDefinition<?>> missingAttributes = null;
     	for (final AttributeDefinition<?> attributeDefinition : requestedA.getDefinitions()) {
