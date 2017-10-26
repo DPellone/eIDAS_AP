@@ -19,8 +19,8 @@
         <constructor-arg value="/home/daniele/Documenti/EIDAS-Config/specific/" />
     </bean>
 
-    
-<!--
+
+<!-- 
     <bean id="eidasConfigRepository" class="java.lang.String">
         <constructor-arg value="#{ systemProperties['EIDAS_CONFIG_REPOSITORY'] ?: systemEnvironment['EIDAS_CONFIG_REPOSITORY'] }" />
     </bean>

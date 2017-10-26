@@ -14,8 +14,8 @@
         <constructor-arg value="/home/daniele/Documenti/EIDAS-Config/sp/" />
     </bean>
 
-    <!-- 
-
+    
+<!-- 
     <bean id="spConfigRepository" class="java.lang.String">
         <constructor-arg value="#{ systemProperties['SP_CONFIG_REPOSITORY'] ?: systemEnvironment['SP_CONFIG_REPOSITORY'] }" />
     </bean>

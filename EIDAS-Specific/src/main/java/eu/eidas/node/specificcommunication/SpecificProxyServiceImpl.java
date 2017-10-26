@@ -1,8 +1,10 @@
 package eu.eidas.node.specificcommunication;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -10,6 +12,10 @@ import java.util.List;
 import java.util.Map;
 
 import javax.annotation.Nonnull;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -67,7 +73,7 @@ import static eu.eidas.node.SpecificServletHelper.getHttpRequestParameters;
  */
 public class SpecificProxyServiceImpl implements ISpecificProxyService {
 
-	private static final Logger LOGGER = LoggerFactory.getLogger(SpecificProxyServiceImpl.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(SpecificProxyServiceImpl.class);
 
     private CitizenAuthenticationBean citizenAuthentication;
 
@@ -275,8 +281,21 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
 							return LightResponse.builder(authenticationResponse).build();
 						}
 						
-						HttpURLConnection webServiceRequest = (HttpURLConnection) new URL(((SpecificEidasService)specificService).getServiceProperties().getProperty("webservice.mappingURL") + APid).openConnection();
-
+						KeyStore ks = KeyStore.getInstance("JKS");
+			    		FileInputStream fis = new FileInputStream(((SpecificEidasService)specificService).getServiceProperties().getProperty("webservice.keystore"));
+			    		ks.load(fis, ((SpecificEidasService)specificService).getServiceProperties().getProperty("webservice.keystore.passw").toCharArray());
+			    		
+			    		KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+			    		kmf.init(ks, ((SpecificEidasService)specificService).getServiceProperties().getProperty("webservice.keystore.passw").toCharArray());
+			    		TrustManagerFactory tmf = TrustManagerFactory.getInstance("SunX509");
+			    		tmf.init(ks);
+			    		
+			    		SSLContext sc = SSLContext.getInstance("TLS");
+			    		sc.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
+			    		
+						HttpsURLConnection webServiceRequest = (HttpsURLConnection) new URL(((SpecificEidasService)specificService).getServiceProperties().getProperty("webservice.mappingURL") + APid).openConnection();
+						webServiceRequest.setSSLSocketFactory(sc.getSocketFactory());
+						
 						if(webServiceRequest.getResponseCode() != 200){
 							authenticationResponse = AuthenticationResponse.builder(specificResponse)
 		            				.failure(true)

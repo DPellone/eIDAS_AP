@@ -9,15 +9,15 @@
         The EIDAS Specifc library provides a reference code to let each member state developer to fulfil it's own
         requirenments on the EIDAS Authentications (communication with IdP/AP).
     </description>
-    <properties>
-    	<jackson-2-version>2.8.9</jackson-2-version>
-    </properties>
     <parent>
         <groupId>eu.eidas</groupId>
         <artifactId>eidas-parent</artifactId>
-        <version>1.3.0</version>
+        <version>1.4.0</version>
         <relativePath>../EIDAS-Parent/pom.xml</relativePath>
     </parent>
+    <properties>
+		<jackson-2-version>2.8.9</jackson-2-version>
+ 	</properties>
     <dependencies>
         <!-- 1) Dependencies on other modules: -->
         <dependency>
@@ -42,25 +42,23 @@
         </dependency>
 
         <!-- 2) Dependencies on libraries: -->
-        
-        <!-- MOD: Jackson -->
+        <!-- MOD -->
         <dependency>
    			<groupId>com.fasterxml.jackson.core</groupId>
    			<artifactId>jackson-core</artifactId>
    			<version>${jackson-2-version}</version>
  		</dependency>
-        
+ 		<dependency>
+  			<groupId>com.fasterxml.jackson.core</groupId>
+  			<artifactId>jackson-databind</artifactId>
+  			<version>${jackson-2-version}</version>
+		</dependency>
         <!-- Joda -->
         <dependency>
             <groupId>joda-time</groupId>
             <artifactId>joda-time</artifactId>
             <scope>provided</scope>
         </dependency>
-        <dependency>
-  			<groupId>com.fasterxml.jackson.core</groupId>
-  			<artifactId>jackson-databind</artifactId>
-  			<version>${jackson-2-version}</version>
-		</dependency>
 
         <!-- Servlet -->
         <dependency>
