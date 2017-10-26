@@ -13,17 +13,9 @@ import eu.eidas.auth.commons.attribute.ImmutableAttributeMap;
 
 
 // --- MOD ---
-public class IDBuilder {
+public abstract class IDBuilder {
 	
-	private ImmutableAttributeMap attributes;
-	private List<StringToken> syntax;
-	
-	public IDBuilder(List<StringToken> syntax, ImmutableAttributeMap attributes){
-		this.syntax = syntax;
-		this.attributes = attributes;
-	}
-	
-	public String getID() {
+	public static String getID(List<StringToken> syntax, ImmutableAttributeMap attributes) {
 		String id = "";
 		for (StringToken stringToken : syntax) {
 			if(!stringToken.getIsAttribute()){
@@ -44,7 +36,7 @@ public class IDBuilder {
 		return id;
 	}
 	
-	private String applyModifiers(String string, StringToken token){
+	private static String applyModifiers(String string, StringToken token){
 		String newString = new String(string);
 		if(token.getCharacters() != null)
 			newString = string.substring(0, token.getCharacters().intValue());

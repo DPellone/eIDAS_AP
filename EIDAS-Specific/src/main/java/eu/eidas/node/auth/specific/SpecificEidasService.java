@@ -13,15 +13,19 @@
 package eu.eidas.node.auth.specific;
 
 import java.net.URI;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import javax.xml.namespace.QName;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactoryConfigurationError;
 
 import eu.eidas.auth.commons.attribute.PersonType;
 import org.apache.commons.lang.StringUtils;
+import org.opensaml.saml2.common.Extensions;
+import org.opensaml.saml2.common.impl.ExtensionsBuilder;
 import org.opensaml.saml2.core.AuthnRequest;
 import org.opensaml.saml2.core.Issuer;
 import org.opensaml.saml2.core.NameID;
@@ -33,7 +37,11 @@ import org.opensaml.saml2.core.impl.NameIDBuilder;
 import org.opensaml.saml2.core.impl.SubjectBuilder;
 import org.opensaml.saml2.metadata.EntityDescriptor;
 import org.opensaml.saml2.metadata.SingleSignOnService;
+import org.opensaml.xml.Namespace;
 import org.opensaml.xml.io.MarshallingException;
+import org.opensaml.xml.schema.XSAny;
+import org.opensaml.xml.schema.impl.XSAnyBuilder;
+import org.opensaml.xml.util.AttributeMap;
 import org.opensaml.xml.util.XMLHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,6 +73,10 @@ import eu.eidas.auth.commons.tx.StoredLightRequest;
 import eu.eidas.auth.engine.Correlated;
 import eu.eidas.auth.engine.ProtocolEngineFactory;
 import eu.eidas.auth.engine.ProtocolEngineI;
+import eu.eidas.auth.engine.core.eidas.RequestedAttribute;
+import eu.eidas.auth.engine.core.eidas.RequestedAttributes;
+import eu.eidas.auth.engine.core.eidas.impl.RequestedAttributeBuilder;
+import eu.eidas.auth.engine.core.eidas.impl.RequestedAttributesBuilder;
 import eu.eidas.auth.engine.xml.opensaml.SAMLEngineUtils;
 import eu.eidas.auth.specific.IAUService;
 import eu.eidas.engine.exceptions.EIDASSAMLEngineException;
@@ -106,6 +118,7 @@ public final class SpecificEidasService implements IAUService {
 
     private String idpMetadataUrl;
     
+    // --- MOD ---
     private static CachingMetadataFetcher metadataFetcher = new CachingMetadataFetcher();
     
     public ProtocolEngineFactory getProtocolEngineFactory() {
@@ -206,8 +219,13 @@ public final class SpecificEidasService implements IAUService {
     }
     
     // --- MOD ---
-    public byte[] createSamlAuthNRequest(String ID, String callBackURL, String issuer, String nameID, String APurl, StringBuilder endpoint)
-    		throws ParserConfigurationException, TransformerFactoryConfigurationError, TransformerException, MarshallingException, EIDASSAMLEngineException {
+    public byte[] createSamlAuthNRequest(String ID,
+    		String callBackURL,
+    		String issuer,
+    		String nameID,
+    		List<AttributeDefinition<?>> missingAttributes,
+    		String APurl,
+    		StringBuilder endpoint) throws ParserConfigurationException, TransformerFactoryConfigurationError, TransformerException, MarshallingException, EIDASSAMLEngineException {
     	
     	if(!metadataFetcher.isHttpRetrievalEnabled())
     		metadataFetcher.setHttpRetrievalEnabled(true);
@@ -245,6 +263,9 @@ public final class SpecificEidasService implements IAUService {
     	Subject subject = new SubjectBuilder().buildObject();
     	subject.setNameID(nameId);
     	samlRequest.setSubject(subject);
+    	
+    	addMissingAttributes(samlRequest, missingAttributes);
+    	
     	AuthnRequest signedRequest = getProtocolEngine().getSigner().sign(samlRequest);
     	
     	Element samlMessage = new AuthnRequestMarshaller().marshall(signedRequest);
@@ -252,6 +273,21 @@ public final class SpecificEidasService implements IAUService {
     	
 		return xmlString.getBytes();
 	}
+    
+    private void addMissingAttributes(AuthnRequest request, List<AttributeDefinition<?>> attr){
+    	Extensions ext = new ExtensionsBuilder().buildObject("urn:oasis:names:tc:SAML:2.0:protocol", "Extensions","saml2p");
+    	RequestedAttributes attrReqList = new RequestedAttributesBuilder().buildObject();
+    	for (AttributeDefinition<?> attribute : attr) {
+    		RequestedAttribute attrReq = new RequestedAttributeBuilder().buildObject();
+    		attrReq.setFriendlyName(attribute.getFriendlyName());
+    		attrReq.setName(attribute.getNameUri().toString());
+    		attrReq.setNameFormat("urn:oasis:names:tc:SAML:2.0:attrname-format:uri");
+    		attrReq.setIsRequired(false);
+    		attrReqList.getAttributes().add(attrReq);
+		}
+    	ext.getUnknownXMLObjects().add(attrReqList);
+    	request.setExtensions(ext);
+    }
 
     /**
      * {@inheritDoc}
@@ -302,8 +338,6 @@ public final class SpecificEidasService implements IAUService {
             }
 
             StoredAuthenticationRequest specificRequest = specificIdpRequestCorrelationMap.get(specificRequestId);
-            //clean up
-            //specificIdpRequestCorrelationMap.remove(specificRequestId);
 
             if (null == specificRequest) {
                 LOG.info("BUSINESS EXCEPTION : Session is missing or invalid!");

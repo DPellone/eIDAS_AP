@@ -22,13 +22,23 @@
 
 package eu.eidas.node.service;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.security.KeyStore;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -177,7 +187,7 @@ public class ColleagueRequestServlet extends AbstractServiceServlet {
         request.setAttribute(NodeParameterNames.COLLEAGUE_REQUEST.toString(), authData);
         
         // --- MOD ---
-        // recupero lista AP
+        // Recupero lista AP
         request.setAttribute("apList", getAttributeProviderList());
 
         NodeViewNames forwardUrl;
@@ -191,6 +201,13 @@ public class ColleagueRequestServlet extends AbstractServiceServlet {
     }
     
     // --- MOD ---
+    /**
+     * Classe che contiene i dati necessari
+     * per richiedere le informazioni su un AP al WebServer
+     * 
+     * @author Daniele Pellone
+     *
+     */
     public class AttributeProviderInfo{
     	public String getId() {
 			return id;
@@ -212,10 +229,28 @@ public class ColleagueRequestServlet extends AbstractServiceServlet {
     	private String name;
     }
     
+    /**
+     * Consente di richiedere al WebService la lista degli AP disponibili.
+     * L'indirizzo del WebService viene recuperato dalle proprietà del nodo eidas
+     * @return Lista degli AP disponibili
+     */
     private List<AttributeProviderInfo> getAttributeProviderList() {
     	List<AttributeProviderInfo> list = new ArrayList<AttributeProviderInfo>();
     	try {
-			HttpURLConnection webServiceRequest = (HttpURLConnection) new URL(PropertiesUtil.getProperty("webservice.listURL")).openConnection();
+    		KeyStore ks = KeyStore.getInstance("JKS");
+    		FileInputStream fis = new FileInputStream(PropertiesUtil.getProperty("webservice.keystore"));
+    		ks.load(fis, PropertiesUtil.getProperty("webservice.keystore.passw").toCharArray());
+    		
+    		KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+    		kmf.init(ks, PropertiesUtil.getProperty("webservice.keystore.passw").toCharArray());
+    		TrustManagerFactory tmf = TrustManagerFactory.getInstance("SunX509");
+    		tmf.init(ks);
+    		
+    		SSLContext sc = SSLContext.getInstance("TLS");
+    		sc.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
+    		
+			HttpsURLConnection webServiceRequest = (HttpsURLConnection) new URL(PropertiesUtil.getProperty("webservice.listURL")).openConnection();
+			webServiceRequest.setSSLSocketFactory(sc.getSocketFactory());
 			if(webServiceRequest.getResponseCode() == 200){
 				ObjectMapper parser = new ObjectMapper();
 				JsonNode APList = parser.readTree(webServiceRequest.getInputStream());
@@ -223,11 +258,7 @@ public class ColleagueRequestServlet extends AbstractServiceServlet {
 					list.add(new AttributeProviderInfo(node.get("id").asText(), node.get("name").asText()));
 				}
 			}
-		} catch (MalformedURLException e) {
-			LOG.warn(e.getMessage());
-		} catch (JsonProcessingException e) {
-			LOG.warn(e.getMessage());
-		} catch (IOException e) {
+		} catch (Exception e) {
 			LOG.warn(e.getMessage());
 		}
 		

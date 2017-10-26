@@ -8,7 +8,7 @@
 <%@ taglib prefix="token" uri="https://eidas.europa.eu/" %>
 
 <html>
-
+<%-- --- MOD --- --%>
 <head>
     <jsp:include page="htmlHead.jsp"/>
     <title><fmt:message key="eidas.title" bundle="${i18n_eng}"/></title>

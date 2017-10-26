@@ -175,6 +175,8 @@
                                                 </li>
                                             </c:if>
                                             </c:forEach>
+                                            
+                                            <%-- --- MOD --- --%>
                                             <c:if test="${categoryIsDisplayed=='true'}">
                                                 </ul>
                                                 <div>
@@ -187,6 +189,7 @@
                                                     </select>
                                                 </div>
                                             </c:if>
+                                            
                                     </div>
                                     <div class="col-sm-6"> <% /** Legal person */ %>
                                         <c:set var="categoryIsDisplayed" value="false"/>

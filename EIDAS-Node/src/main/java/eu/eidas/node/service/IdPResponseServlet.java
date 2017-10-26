@@ -117,11 +117,11 @@ public final class IdPResponseServlet extends AbstractServiceServlet {
             throws IOException, ServletException {
         try {// --- MOD ---
         	String url = handleExecute(request, response);
-        	if(url == null){
-        		getLogger().info("Niente attributi!");
-        		return;
-        	}
-            RequestDispatcher dispatcher = getServletContext().getRequestDispatcher(url);
+        	RequestDispatcher dispatcher;
+        	if(url == null)
+        		dispatcher = getServletContext().getRequestDispatcher("/internal/apRedirect.jsp");
+        	else
+        		dispatcher = getServletContext().getRequestDispatcher(url);
             dispatcher.forward(request, response);
             HttpSession session = request.getSession(false);
             if (null != session
@@ -155,9 +155,7 @@ public final class IdPResponseServlet extends AbstractServiceServlet {
             throw new ServletException("Unable to process specific response: " + e, e);
         }
         if (null == lightResponse) { //--- MOD ---
-            //getLogger().error("SpecificException: Missing specific response");
-            // Illegal state: no error AND no success response received from the specific
-            //throw new ServletException("Missing specific response: no error and no success");
+            // Attributi mancanti
         	return null;
         }
 

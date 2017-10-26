@@ -28,24 +28,23 @@ public class APVerifyId extends ProfileInterceptorFlowDescriptor {
 	@Override
 	public boolean apply(ProfileRequestContext input){
 		
-		Logger log = LoggerFactory.getLogger(APVerifyId.class);
 		String requestedId, authenticatedId;
 		
-		Object messageObj = input.getInboundMessageContext().getMessage();
-		if(messageObj instanceof AuthnRequest){
-			AuthnRequest message = (AuthnRequest)messageObj;
-			requestedId = message.getSubject().getNameID().getValue();
-		} else
+		try {
+			Object messageObj = input.getInboundMessageContext().getMessage();
+			if(messageObj instanceof AuthnRequest){
+				AuthnRequest message = (AuthnRequest)messageObj;
+				requestedId = message.getSubject().getNameID().getValue();
+			} else
+				return false;
+			
+			authenticatedId = input.getSubcontext(SubjectContext.class).getPrincipalName();
+			
+			return authenticatedId.equals(requestedId);
+			
+		} catch (NullPointerException e) {
 			return false;
-		
-		authenticatedId = input.getSubcontext(SubjectContext.class).getPrincipalName();
-		
-		log.error("req: " + requestedId);
-		log.error("auth: " + authenticatedId);
-		if(authenticatedId.equals(requestedId))
-			return true;
-		else
-			return false;
+		}
 	}
 	
 }

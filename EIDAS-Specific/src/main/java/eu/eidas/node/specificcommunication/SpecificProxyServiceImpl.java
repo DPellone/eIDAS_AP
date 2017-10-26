@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import eu.eidas.auth.commons.EIDASStatusCode;
+import eu.eidas.auth.commons.EIDASUtil;
 import eu.eidas.auth.commons.EidasErrorKey;
 import eu.eidas.auth.commons.EidasErrors;
 import eu.eidas.auth.commons.EidasParameterKeys;
@@ -42,6 +43,7 @@ import eu.eidas.auth.commons.tx.CorrelationMap;
 import eu.eidas.auth.commons.tx.StoredLightRequest;
 import eu.eidas.auth.commons.validation.NormalParameterValidator;
 import eu.eidas.auth.engine.SamlEngine;
+import eu.eidas.auth.engine.xml.opensaml.SAMLEngineUtils;
 import eu.eidas.auth.specific.IAUService;
 import eu.eidas.node.CitizenAuthenticationBean;
 import eu.eidas.node.SpecificIdPBean;
@@ -192,7 +194,7 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
         IAuthenticationResponse specificResponse = authenticationExchange.getConnectorResponse();
 
         IAuthenticationRequest specificAuthnRequest = authenticationExchange.getStoredRequest().getRequest();
-        StoredLightRequest proxyServiceRequest = getStoredLightRequest(specificService, specificAuthnRequest);
+        StoredLightRequest proxyServiceRequest = getStoredLightRequest(specificService, specificResponse.getInResponseToId());
 
         httpServletRequest.removeAttribute(EidasParameterKeys.ATTRIBUTE_LIST.toString());
 
@@ -212,6 +214,7 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
             httpServletRequest.setAttribute(EidasParameterKeys.EIDAS_SERVICE_LOA.toString(),
                                             specificResponse.getLevelOfAssurance());
 
+            // --- MOD ---
             ImmutableAttributeMap requestedAttributes = specificAuthnRequest.getRequestedAttributes();
             boolean partialResponse = incompleteResponses.containsKey(specificResponse.getInResponseToId());
 
@@ -242,7 +245,7 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
             	
             	List<AttributeDefinition<?>> missingAttributes = getMissingAttributes(requestedAttributes, gatheredAttributes);
             	
-            	if(missingAttributes == null){
+            	if(missingAttributes == null){ // Successo: tutti gli attributi sono stati recuperati
             		if(partialResponse){
 		                ILightRequest proxyServiceAuthnRequest = proxyServiceRequest.getRequest();
 		                authenticationResponse = AuthenticationResponse.builder(incompleteResponses.remove(specificResponse.getInResponseToId()))
@@ -260,17 +263,12 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
             		
             		String message = "Attributi mancanti";
             		try {
-            			
             			String APid = requestAttributeProviderCorrelationMap.get(specificResponse.getInResponseToId());
-            			LOGGER.error("AP: " + APid);
-            			LOGGER.error("ID: " + specificResponse.getInResponseToId());
 						if(APid == null || APid == "null"){
-							authenticationResponse = AuthenticationResponse.builder(specificResponse)
-		            				.failure(true)
-		            				.statusCode(EidasErrors.get(EidasErrorKey.INVALID_ATTRIBUTE_LIST.errorCode()))
-		            				.statusMessage("No AP provided")
-		            				.inResponseTo(proxyServiceRequest.getRequest().getId())
-		            				.build();
+							ILightRequest proxyServiceAuthnRequest = proxyServiceRequest.getRequest();
+			                authenticationResponse = AuthenticationResponse.builder(specificResponse)
+			                        .inResponseTo(proxyServiceAuthnRequest.getId())
+			                        .build();
 							specificService.getProxyServiceRequestCorrelationMap().remove(specificAuthnRequest.getId());
 							specificService.getSpecificIdpRequestCorrelationMap().remove(specificResponse.getInResponseToId());
 							requestAttributeProviderCorrelationMap.remove(specificResponse.getInResponseToId());
@@ -294,47 +292,58 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
 						
 						ObjectMapper parser = new ObjectMapper();
 						JsonNode APInfo = parser.readTree(webServiceRequest.getInputStream());
+						
 						String apMetadataUrl = APInfo.get("url").asText();
+						
 						List<StringToken> syntax = parser.readValue(APInfo.get("token").traverse(), new TypeReference<List<StringToken>>(){});
-						IDBuilder newIdBuilder = new IDBuilder(syntax, specificResponse.getAttributes());
-						String newID = newIdBuilder.getID();
-						String requestId = specificResponse.getInResponseToId();
+						String newID = IDBuilder.getID(syntax, specificResponse.getAttributes());
+						
+						String requestId = SAMLEngineUtils.generateNCName();
 						authenticationResponse = AuthenticationResponse.builder(specificResponse)
 		                        .inResponseTo(proxyServiceRequest.getRequest().getId())
 		                        .build();
+						
 						incompleteResponses.put(requestId, authenticationResponse);
+						requestAttributeProviderCorrelationMap.remove(specificResponse.getInResponseToId());
+						specificService.getProxyServiceRequestCorrelationMap().put(requestId,
+								specificService.getProxyServiceRequestCorrelationMap().get(specificAuthnRequest.getId()));
+						specificService.getProxyServiceRequestCorrelationMap().remove(specificAuthnRequest.getId());
+						
+						specificService.getSpecificIdpRequestCorrelationMap().put(requestId,
+								specificService.getSpecificIdpRequestCorrelationMap().get(specificResponse.getInResponseToId()));
+				        specificService.getSpecificIdpRequestCorrelationMap().remove(specificResponse.getInResponseToId());
 						
 						StringBuilder apUrl = new StringBuilder();
 						byte[] apMessage = ((SpecificEidasService)specificService).createSamlAuthNRequest(requestId,
 								citizenAuthentication.getSpecAuthenticationNode().getCallBackURL(),
 								"http://192.168.89.134:8080/EidasNode/ServiceRequesterMetadata",
-								newID, apMetadataUrl, apUrl);
+								newID,
+								missingAttributes,
+								apMetadataUrl,
+								apUrl);
 						
 						String samlToken = EidasStringUtil.encodeToBase64(apMessage);
 						httpServletRequest.setAttribute(EidasParameterKeys.BINDING.toString(), EidasSamlBinding.POST.getName());
 		                httpServletRequest.setAttribute(SpecificParameterNames.SAML_TOKEN.toString(), samlToken);
 		                httpServletRequest.setAttribute("apUrl", apUrl.toString());
-		                RequestDispatcher dispatcher = httpServletRequest.getRequestDispatcher("/internal/apRedirect.jsp");
-		                dispatcher.forward(httpServletRequest, httpServletResponse);
-		                
 		                return null;
 						
 					} catch (Exception e) {
 						LOGGER.error(e.getMessage());
+						authenticationResponse = AuthenticationResponse.builder(specificResponse)
+								.failure(true)
+								.statusCode(EidasErrors.get(EidasErrorKey.INVALID_ATTRIBUTE_LIST.errorCode()))
+								.statusMessage(message)
+								.inResponseTo(proxyServiceRequest.getRequest().getId())
+								.build();
 					}
-            		authenticationResponse = AuthenticationResponse.builder(specificResponse)
-            				.failure(true)
-            				.statusCode(EidasErrors.get(EidasErrorKey.INVALID_ATTRIBUTE_LIST.errorCode()))
-            				.statusMessage(message)
-            				.inResponseTo(proxyServiceRequest.getRequest().getId())
-            				.build();
             	}
 
             }
         }
         specificService.getProxyServiceRequestCorrelationMap().remove(specificAuthnRequest.getId());
         specificService.getSpecificIdpRequestCorrelationMap().remove(specificResponse.getInResponseToId());
-		    requestAttributeProviderCorrelationMap.remove(specificResponse.getInResponseToId());
+		requestAttributeProviderCorrelationMap.remove(specificResponse.getInResponseToId());
         //build the LightResponse
         return LightResponse.builder(authenticationResponse).build();
     }
@@ -366,19 +375,19 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
     }
 
     private StoredLightRequest getStoredLightRequest(IAUService specificService,
-                                                     IAuthenticationRequest specificAuthnRequest)
+                                                     String Id)
             throws SpecificException {
 
         CorrelationMap<StoredLightRequest> proxyServiceRequestCorrelationMap =
                 specificService.getProxyServiceRequestCorrelationMap();
-        StoredLightRequest proxyServiceRequest = proxyServiceRequestCorrelationMap.get(specificAuthnRequest.getId());
+        StoredLightRequest proxyServiceRequest = proxyServiceRequestCorrelationMap.get(Id);
 
         if (null == proxyServiceRequest) {
             LOGGER.error(
-                    "ProxyService Request cannot be found for Specific Request ID: \"" + specificAuthnRequest.getId()
+                    "ProxyService Request cannot be found for Specific Request ID: \"" + Id
                             + "\"");
             throw new SpecificException(
-                    "ProxyService Request cannot be found for Specific Request ID: \"" + specificAuthnRequest.getId()
+                    "ProxyService Request cannot be found for Specific Request ID: \"" + Id
                             + "\"");
         }
         //clean up
