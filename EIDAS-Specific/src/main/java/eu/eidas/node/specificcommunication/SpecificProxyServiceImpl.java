@@ -281,6 +281,7 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
 							return LightResponse.builder(authenticationResponse).build();
 						}
 						
+						// Preparazione richiesta WebService
 						KeyStore ks = KeyStore.getInstance("JKS");
 			    		FileInputStream fis = new FileInputStream(((SpecificEidasService)specificService).getServiceProperties().getProperty("webservice.keystore"));
 			    		ks.load(fis, ((SpecificEidasService)specificService).getServiceProperties().getProperty("webservice.keystore.passw").toCharArray());
@@ -296,6 +297,7 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
 						HttpsURLConnection webServiceRequest = (HttpsURLConnection) new URL(((SpecificEidasService)specificService).getServiceProperties().getProperty("webservice.mappingURL") + APid).openConnection();
 						webServiceRequest.setSSLSocketFactory(sc.getSocketFactory());
 						
+						// Richiesta al WebService per le info sull'AP
 						if(webServiceRequest.getResponseCode() != 200){
 							authenticationResponse = AuthenticationResponse.builder(specificResponse)
 		            				.failure(true)
@@ -309,19 +311,23 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
 							return LightResponse.builder(authenticationResponse).build();
 						}
 						
+						// Parsing delle informazioni
 						ObjectMapper parser = new ObjectMapper();
 						JsonNode APInfo = parser.readTree(webServiceRequest.getInputStream());
 						
 						String apMetadataUrl = APInfo.get("url").asText();
 						
+						// Costruzione dell'ID utente
 						List<StringToken> syntax = parser.readValue(APInfo.get("token").traverse(), new TypeReference<List<StringToken>>(){});
 						String newID = IDBuilder.getID(syntax, specificResponse.getAttributes());
 						
+						//Costruzione risposta per il Connector incompleta
 						String requestId = SAMLEngineUtils.generateNCName();
 						authenticationResponse = AuthenticationResponse.builder(specificResponse)
 		                        .inResponseTo(proxyServiceRequest.getRequest().getId())
 		                        .build();
 						
+						// Memorizzazione risposta incompleta e sostituzione dei mapping
 						incompleteResponses.put(requestId, authenticationResponse);
 						requestAttributeProviderCorrelationMap.remove(specificResponse.getInResponseToId());
 						specificService.getProxyServiceRequestCorrelationMap().put(requestId,
@@ -332,6 +338,7 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
 								specificService.getSpecificIdpRequestCorrelationMap().get(specificResponse.getInResponseToId()));
 				        specificService.getSpecificIdpRequestCorrelationMap().remove(specificResponse.getInResponseToId());
 						
+				        // Creazione richiesta AP
 						StringBuilder apUrl = new StringBuilder();
 						byte[] apMessage = ((SpecificEidasService)specificService).createSamlAuthNRequest(requestId,
 								citizenAuthentication.getSpecAuthenticationNode().getCallBackURL(),
@@ -341,6 +348,7 @@ public class SpecificProxyServiceImpl implements ISpecificProxyService {
 								apMetadataUrl,
 								apUrl);
 						
+						// Preparazione al redirect
 						String samlToken = EidasStringUtil.encodeToBase64(apMessage);
 						httpServletRequest.setAttribute(EidasParameterKeys.BINDING.toString(), EidasSamlBinding.POST.getName());
 		                httpServletRequest.setAttribute(SpecificParameterNames.SAML_TOKEN.toString(), samlToken);

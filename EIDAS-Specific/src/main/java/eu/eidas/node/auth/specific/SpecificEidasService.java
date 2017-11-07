@@ -219,6 +219,17 @@ public final class SpecificEidasService implements IAUService {
     }
     
     // --- MOD ---
+    /**
+     * Funzione che crea la richiesta SAML da inviare all'AP
+     * @param ID Identificativo della richiesta
+     * @param callBackURL Endpoint del nodo dove inviare la risposta
+     * @param issuer Identificativo del nodo che emette la richiesta
+     * @param nameID Identificativo dell'utente di cui richiedere gli attributi
+     * @param missingAttributes Lista di attributi mancanti richiesti
+     * @param APurl URL da cui recuperare i Metadati dell'AP
+     * @param endpoint Endpoint, recuperato dai Metadati, a cui inviare la richiesta
+     * @return Array di byte che rappresenta la richiesta codificata in Base64
+     */
     public byte[] createSamlAuthNRequest(String ID,
     		String callBackURL,
     		String issuer,
